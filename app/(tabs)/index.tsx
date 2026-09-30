@@ -8,9 +8,14 @@ import {
   addComment,
   buildThread,
   formatRelativeTime,
+  isComment,
+  pruneOrphans,
+  removeComment,
   toggleLike,
   validateComment,
 } from "../../lib/comments";
+import { isStringArray, listCodec, valueCodec } from "../../lib/persist";
+import { usePersistentState } from "../../lib/usePersistentState";
 
 const START = Date.now();
 const SEED: Comment[] = [
@@ -19,12 +24,17 @@ const SEED: Comment[] = [
   { id: "3", parentId: null, author: "Cat", body: "Could we get dark mode next?", createdAt: START - 20 * 60_000, likes: 2 },
 ];
 const SORTS: SortOrder[] = ["newest", "oldest", "top"];
+const commentsCodec = listCodec(isComment);
+const likedCodec = valueCodec(isStringArray);
+const authorCodec = valueCodec((v: unknown): v is string => typeof v === "string");
 
 export default function CommentsScreen() {
-  const [comments, setComments] = useState<Comment[]>(SEED);
-  const [liked, setLiked] = useState<Set<string>>(new Set());
+  const [stored, setComments] = usePersistentState<Comment[]>("comments.v1", SEED, commentsCodec);
+  const [likedIds, setLikedIds] = usePersistentState<string[]>("comments.liked.v1", [], likedCodec);
+  const [author, setAuthor] = usePersistentState("comments.author.v1", "", authorCodec);
+  const comments = useMemo(() => pruneOrphans(stored), [stored]);
+  const liked = useMemo(() => new Set(likedIds), [likedIds]);
   const [order, setOrder] = useState<SortOrder>("newest");
-  const [author, setAuthor] = useState("");
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
@@ -45,12 +55,12 @@ export default function CommentsScreen() {
   const like = (id: string) => {
     const isLiked = liked.has(id);
     setComments((list) => toggleLike(list, id, !isLiked));
-    setLiked((set) => {
-      const next = new Set(set);
-      if (isLiked) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setLikedIds((ids) => (isLiked ? ids.filter((x) => x !== id) : [...ids, id]));
+  };
+
+  const remove = (id: string) => {
+    setComments((list) => removeComment(list, id));
+    if (replyTo?.id === id) setReplyTo(null);
   };
 
   const renderNode = (node: ThreadNode, depth: number) => (
@@ -75,6 +85,15 @@ export default function CommentsScreen() {
         >
           <Text style={styles.action}>Reply</Text>
         </Pressable>
+        {author.trim() !== "" && node.author === author.trim() && (
+          <Pressable
+            accessibilityLabel={`Delete your comment and its replies`}
+            accessibilityRole="button"
+            onPress={() => remove(node.id)}
+          >
+            <Text style={styles.action}>Delete</Text>
+          </Pressable>
+        )}
       </View>
       {node.replies.map((r) => renderNode(r, depth + 1))}
     </View>
@@ -86,7 +105,7 @@ export default function CommentsScreen() {
         {replyTo && (
           <View style={styles.replyBanner}>
             <Text style={styles.replyText}>Replying to {replyTo.author}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setReplyTo(null)}>
+            <Pressable accessibilityLabel="Cancel reply" accessibilityRole="button" onPress={() => setReplyTo(null)}>
               <Text style={styles.action}>Cancel</Text>
             </Pressable>
           </View>
@@ -124,6 +143,7 @@ export default function CommentsScreen() {
         <Text style={styles.count}>{comments.length} comments</Text>
         {SORTS.map((s) => (
           <Pressable
+            accessibilityLabel={`Sort by ${s}`}
             accessibilityRole="button"
             accessibilityState={{ selected: s === order }}
             key={s}

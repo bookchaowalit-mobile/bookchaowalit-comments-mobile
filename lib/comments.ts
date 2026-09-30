@@ -135,3 +135,25 @@ export function formatRelativeTime(timestamp: number, now: number): string {
   if (days < 7) return `${days}d ago`;
   return new Date(timestamp).toISOString().slice(0, 10);
 }
+
+/** Type guard used when loading comments from local storage. */
+export function isComment(value: unknown): value is Comment {
+  if (typeof value !== "object" || value === null) return false;
+  const c = value as Record<string, unknown>;
+  return (
+    typeof c.id === "string" &&
+    (c.parentId === null || typeof c.parentId === "string") &&
+    typeof c.author === "string" &&
+    typeof c.body === "string" &&
+    typeof c.createdAt === "number" &&
+    Number.isFinite(c.createdAt) &&
+    typeof c.likes === "number" &&
+    c.likes >= 0
+  );
+}
+
+/** Drops replies whose parent no longer exists (e.g. after a partial load). */
+export function pruneOrphans(comments: Comment[]): Comment[] {
+  const ids = new Set(comments.map((c) => c.id));
+  return comments.filter((c) => c.parentId === null || ids.has(c.parentId));
+}

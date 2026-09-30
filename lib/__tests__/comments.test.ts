@@ -6,6 +6,8 @@ import {
   addComment,
   buildThread,
   formatRelativeTime,
+  isComment,
+  pruneOrphans,
   removeComment,
   toggleLike,
   validateComment,
@@ -85,5 +87,18 @@ describe("formatRelativeTime", () => {
     expect(formatRelativeTime(T0, T0 + 3 * 3_600_000)).toBe("3h ago");
     expect(formatRelativeTime(T0, T0 + 2 * 86_400_000)).toBe("2d ago");
     expect(formatRelativeTime(T0, T0 + 30 * 86_400_000)).toBe("2026-01-01");
+  });
+});
+
+describe("storage guards", () => {
+  it("isComment accepts stored comments and rejects malformed ones", () => {
+    expect(seed().every(isComment)).toBe(true);
+    expect(isComment({ id: "x", parentId: 1, author: "a", body: "b", createdAt: 0, likes: 0 })).toBe(false);
+    expect(isComment({ id: "x", parentId: null, author: "a", body: "b", createdAt: NaN, likes: 0 })).toBe(false);
+    expect(isComment(null)).toBe(false);
+  });
+  it("pruneOrphans removes replies to missing parents", () => {
+    const list = seed().filter((c) => c.id !== "a");
+    expect(pruneOrphans(list).map((c) => c.id)).toEqual(["b"]);
   });
 });
