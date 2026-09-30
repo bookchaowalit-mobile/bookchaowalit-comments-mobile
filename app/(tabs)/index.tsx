@@ -7,6 +7,7 @@ import {
   type ThreadNode,
   addComment,
   buildThread,
+  commentCountLabel,
   formatRelativeTime,
   isComment,
   pruneOrphans,
@@ -140,7 +141,7 @@ export default function CommentsScreen() {
       </View>
 
       <View style={styles.sorts}>
-        <Text style={styles.count}>{comments.length} comments</Text>
+        <Text style={styles.count}>{commentCountLabel(comments.length)}</Text>
         {SORTS.map((s) => (
           <Pressable
             accessibilityLabel={`Sort by ${s}`}

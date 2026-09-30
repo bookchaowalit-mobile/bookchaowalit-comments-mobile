@@ -31,3 +31,13 @@ Score: 6/10 (was 5/10) — comments, likes and the author name now survive resta
 - Accessibility: labels for cancel-reply, sort chips and profile links (`accessibilityRole="link"`).
 - Advisories: `overrides.postcss ^8.5.28` clears the PostCSS highs in Expo metro-config (minor bump). Remaining: `image-size` (metro, bundler-only), `uuid` via `xcode`, `decode-uri-component` via `query-string@7` — all need an Expo SDK major upgrade; not auto-fixed.
 - Verified: typecheck, lint, 18 vitest tests, Android `expo export` bundle.
+
+## Done in this pass (pass 3)
+
+Score: 7.5/10 (was 7/10) — edge-case hunt in `lib/comments.ts`.
+
+- Bug (hang): `depthOf` followed `parentId` without a visited set, so a parent cycle in stored data (or a self-parented comment) froze the JS thread as soon as someone replied into it.
+- Bug: `pruneOrphans` only checked one level, so a reply to a pruned reply was promoted to a top-level comment, and cyclic comments silently vanished from the tree. It now keeps only comments whose chain reaches a root.
+- Bug: comments older than a week showed the UTC date (`toISOString`), a day off for evening comments east of UTC; now the local date.
+- "1 comments" → `commentCountLabel`.
+- Verified: typecheck, lint, 22 vitest tests (TZ-pinned date test), Android `expo export`.

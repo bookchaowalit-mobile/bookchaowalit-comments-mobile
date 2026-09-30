@@ -11,6 +11,7 @@ import {
   removeComment,
   toggleLike,
   validateComment,
+  commentCountLabel,
 } from "../comments";
 
 const T0 = Date.UTC(2026, 0, 1);
@@ -100,5 +101,34 @@ describe("storage guards", () => {
   it("pruneOrphans removes replies to missing parents", () => {
     const list = seed().filter((c) => c.id !== "a");
     expect(pruneOrphans(list).map((c) => c.id)).toEqual(["b"]);
+  });
+});
+
+describe("pass 3 edge cases", () => {
+  const c = (id: string, parentId: string | null): Comment => ({ id, parentId, author: "a", body: "b", createdAt: 0, likes: 0 });
+  it("prunes whole orphaned chains, not just the first level", () => {
+    // "b" lost its parent "a"; "c" (reply to b) must go too instead of becoming top-level.
+    const kept = pruneOrphans([c("root", null), c("b", "a"), c("c", "b"), c("r1", "root")]);
+    expect(kept.map((x) => x.id)).toEqual(["root", "r1"]);
+  });
+  it("drops parent cycles and does not hang when replying into one", () => {
+    const corrupt = [c("x", "y"), c("y", "x"), c("self", "self"), c("root", null)];
+    expect(pruneOrphans(corrupt).map((x) => x.id)).toEqual(["root"]);
+    const next = addComment(corrupt, { author: "a", body: "b", parentId: "x" }, 1, "new");
+    expect(next).toHaveLength(5);
+  });
+  it("shows the local calendar date for older comments", () => {
+    const prev = process.env.TZ;
+    process.env.TZ = "Asia/Bangkok";
+    try {
+      const ts = Date.UTC(2025, 5, 1, 20, 0); // 2025-06-02 03:00 in Bangkok
+      expect(formatRelativeTime(ts, ts + 30 * 86_400_000)).toBe("2025-06-02");
+    } finally {
+      process.env.TZ = prev;
+    }
+  });
+  it("pluralises the comment count", () => {
+    expect(commentCountLabel(1)).toBe("1 comment");
+    expect(commentCountLabel(0)).toBe("0 comments");
   });
 });

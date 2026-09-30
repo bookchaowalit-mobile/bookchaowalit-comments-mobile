@@ -44,9 +44,12 @@ function depthOf(comments: Comment[], id: string | null): number {
   let depth = 0;
   let current = id;
   const byId = new Map(comments.map((c) => [c.id, c]));
+  const seen = new Set<string>();
   while (current) {
     const c = byId.get(current);
-    if (!c) break;
+    // A parent cycle from corrupt storage used to loop forever here.
+    if (!c || seen.has(current)) break;
+    seen.add(current);
     depth += 1;
     current = c.parentId;
   }
@@ -133,7 +136,16 @@ export function formatRelativeTime(timestamp: number, now: number): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(timestamp).toISOString().slice(0, 10);
+  // Local calendar date (toISOString would show the UTC date, a day off
+  // for evening comments east of UTC).
+  const d = new Date(timestamp);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** "1 comment", "3 comments". */
+export function commentCountLabel(n: number): string {
+  return `${n} ${n === 1 ? "comment" : "comments"}`;
 }
 
 /** Type guard used when loading comments from local storage. */
@@ -152,8 +164,35 @@ export function isComment(value: unknown): value is Comment {
   );
 }
 
-/** Drops replies whose parent no longer exists (e.g. after a partial load). */
+/**
+ * Keeps only comments whose ancestor chain reaches a top-level comment:
+ * drops replies whose parent (or any ancestor) is missing, and parent
+ * cycles from corrupt storage, which would otherwise vanish from the tree
+ * or promote a grandchild to the top level.
+ */
 export function pruneOrphans(comments: Comment[]): Comment[] {
-  const ids = new Set(comments.map((c) => c.id));
-  return comments.filter((c) => c.parentId === null || ids.has(c.parentId));
+  const byId = new Map(comments.map((c) => [c.id, c]));
+  const ok = new Map<string, boolean>();
+  const rooted = (start: Comment): boolean => {
+    const path: string[] = [];
+    let c: Comment | undefined = start;
+    let result = false;
+    while (c) {
+      const known = ok.get(c.id);
+      if (known !== undefined) {
+        result = known;
+        break;
+      }
+      if (path.includes(c.id)) break; // cycle
+      path.push(c.id);
+      if (c.parentId === null) {
+        result = true;
+        break;
+      }
+      c = byId.get(c.parentId);
+    }
+    for (const id of path) ok.set(id, result);
+    return result;
+  };
+  return comments.filter(rooted);
 }
