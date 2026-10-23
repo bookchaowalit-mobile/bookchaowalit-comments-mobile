@@ -1,0 +1,46 @@
+# Reviewed OSV exceptions for this Expo SDK 53 app. Each entry has a reason and an expiry.
+# Reviewed 2026-10-23 when the repo moved to platform-ci-workflows v1.1.1 (ci-node + security);
+# same exception set as the canonical template bookchaowalit-mobile/community-hub-mobile.
+# Fixable advisories were fixed instead: vitest 3.2 -> 4.1.12 plus `npm audit fix` (non-breaking).
+# The rest sit inside Expo SDK 53 / React Native 0.79 tooling and cannot move without an
+# SDK major bump. Re-check on the next SDK upgrade or expiry.
+
+# Build-time only: metro (bundler) reads the dimensions of this repo's own committed image
+# assets. image-size 2.x changes the export shape metro 0.82 requires, so an override breaks
+# bundling. Not shipped in the app bundle.
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+ignoreUntil = 2027-01-22
+reason = "image-size JXL/HEIF infinite loop; build-time only via metro on our own assets; 2.0.3 breaks metro 0.82 (SDK 53)."
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+ignoreUntil = 2027-01-22
+reason = "image-size ICNS infinite loop; build-time only via metro on our own assets; 2.0.3 breaks metro 0.82 (SDK 53)."
+
+# No fixed release exists for these three.
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2027-01-22
+reason = "braces nested-pattern stack exhaustion; no fixed release; dev/build tooling (jest-haste-map/metro micromatch) globbing our own sources."
+
+[[IgnoredVulns]]
+id = "GHSA-86w9-cpqp-85rv"
+ignoreUntil = 2027-01-22
+reason = "node-forge RSA PKCS#1 v1.5 signature check; no fixed release; only in @expo/cli code-signing for dev/EAS updates, which this repo does not use."
+
+[[IgnoredVulns]]
+id = "GHSA-hp3w-g68c-fv3c"
+ignoreUntil = 2027-01-22
+reason = "sprintf-js unbounded precision DoS; no fixed release; dev-only via js-yaml 3 / argparse in RN CLI and istanbul config loading, formats our own strings."
+
+# Fixed only in incompatible majors.
+[[IgnoredVulns]]
+id = "GHSA-vcc3-ghjq-m6fr"
+ignoreUntil = 2027-01-22
+reason = "decode-uri-component DoS; fixed only in ESM-only 0.5.0, but query-string 7 (required by expo-router 5.1) needs the CJS 0.2.x. Worst case a malformed deep link stalls this local app instance; no server."
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+ignoreUntil = 2027-01-22
+reason = "uuid v3/v5/v6 buffer bounds; via xcode (expo prebuild iOS project editing), which only calls v4 without a caller buffer. Fixed only in uuid 11+."
